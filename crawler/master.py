@@ -46,26 +46,33 @@ class Master:
             try:
                 conn.settimeout(10)
                 # 接收请求数据
-                msg = json.loads(conn.recv(1024).decode("utf-8"))
+                req = json.loads(conn.recv(1024).decode("utf-8"))
                 # 若Slave的请求命令为get，则向其发送新任务并将任务加入pending队列中
-                if msg["cmd"] == "get":
+                if req["cmd"] == "get":
                     res = dict(
-                        status="ok",
+                        status=dict(
+                            code=0,
+                            msg="success"
+                        ),
                         data=dict(
                             news_url=self.__dispatch_task__()    # 调用dispatch_task()函数时会自动将任务加入pending队列
                         )
                     )
                     conn.send(json.dumps(res).encode("utf-8"))
-                    print("Dispatch {0} to slave {1}".format(res["data"], msg["id"]))
+                    print("Dispatch {0} to slave {1}".format(res["data"], req["id"]))
                     print("{0} urls in pool".format(len(self.__tasks_waiting__)))
                 # 若Slave的请求命令为done，则将pending队列中相应的任务移除
-                elif msg["cmd"] == "done":
-                    self.__done_task__(msg["data"])
+                elif req["cmd"] == "done":
+                    self.__done_task__(req["data"]["news_url"])
                     res = dict(
-                        status="ok"
+                        status=dict(
+                            code=0,
+                            msg="success"
+                        ),
+                        data=""
                     )
                     conn.send(json.dumps(res).encode("utf-8"))
-                    print("Slave {0} done fetching '{1}'".format(msg["id"], msg["data"]))
+                    print("Slave {0} done fetching '{1}'".format(req["id"], req["data"]["news_url"]))
             except socket.timeout:
                 print("Connection timeout")
             conn.close()

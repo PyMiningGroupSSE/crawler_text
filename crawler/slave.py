@@ -66,9 +66,9 @@ class Slave:
             id=self.__slave_id__,
             cmd="get"
         )
-        msg = self.__send_msg__(req)
-        if msg["status"] == "ok":
-            return msg["data"]["news_url"]
+        res = self.__send_msg__(req)
+        if res["status"]["code"] == 0:
+            return res["data"]["news_url"]
         return -1
 
     # 完成任务函数 #
@@ -77,7 +77,9 @@ class Slave:
         req = dict(
             id=self.__slave_id__,
             cmd="done",
-            data=news_url
+            data=dict(
+                news_url=news_url
+            )
         )
         self.__send_msg__(req)
 
