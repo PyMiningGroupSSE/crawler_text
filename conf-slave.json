@@ -1,0 +1,19 @@
+{
+  "host": {
+    "address": "localhost",
+    "port": 8888
+  },
+  "database": {
+    "type": "mongodb",
+    "address": "127.0.0.1",
+    "port": 27017
+  },
+  "xpaths": [
+    {"name": "title", "xpath": "/html/head/meta[@property='og:title']/@content"},
+    {"name": "time", "xpath": "/html/head/meta[@property='article:published_time']/@content"},
+    {"name": "author", "xpath": "/html/head/meta[@property='article:author']/@content"},
+    {"name": "tags", "xpath": "/html/head/meta[@name='tags']/@content"},
+    {"name": "url", "xpath": "/html/head/meta[@property='og:url']/@content"},
+    {"name": "content", "xpath": "//div[@id='artibody']/p/text()"}
+  ]
+}
