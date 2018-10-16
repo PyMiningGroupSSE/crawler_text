@@ -1,5 +1,6 @@
 from selenium import webdriver
 from urllib import request
+from crawler.tasklist import TaskList
 import json
 import math
 import socket
@@ -11,15 +12,12 @@ __ITEMS_PER_PAGE__ = 50
 
 
 class Master:
-    __tasks_waiting__ = None
-    __tasks_pending__ = None
+    __task_list__ = None
     __socket__ = None
 
     # 类初始化
     def __init__(self, addr, port):
-        self.__tasks_waiting__ = list()
-        self.__tasks_pending__ = list()
-        self.__tasks_period__ = list()
+        self.__task_list__ = TaskList(30)
         self.__socket__ = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.__socket__.bind((addr, int(port)))
         self.__socket__.listen(__MAX_SLAVES__)
@@ -28,7 +26,7 @@ class Master:
     def analyze_urls(self, entries):
         for entry in entries:
             if "api_json" in entry:
-                self.__tasks_waiting__.extend(self.__parse_api_json__(entry, 150))
+                self.__task_list__.put_tasks(self.__parse_api_json__(entry, 150))
             elif "url" in entry:
                 # TODO: use selenium to parse simple html
                 pass
@@ -38,7 +36,7 @@ class Master:
         print("Waiting for slaves...")
         while True:
             # 若任务列表为空，则程序退出
-            if self.__is_tasks_list_empty():
+            if self.__task_list__.is_empty():
                 print("All tasks done!")
                 break
             # 接受来自Slave节点的连接
@@ -60,7 +58,6 @@ class Master:
                     )
                     conn.send(json.dumps(res).encode("utf-8"))
                     print("Dispatch {0} to slave {1}".format(res["data"], req["id"]))
-                    print("{0} urls in pool".format(len(self.__tasks_waiting__)))
                 # 若Slave的请求命令为done，则将pending队列中相应的任务移除
                 elif req["cmd"] == "done":
                     self.__done_task__(req["data"]["news_url"])
@@ -95,19 +92,11 @@ class Master:
 
     # 分发任务 #
     def __dispatch_task__(self):
-        if len(self.__tasks_waiting__) == 0:
+        news_url = self.__task_list__.get_task()
+        if news_url is None:
             return -1
-        news_url = self.__tasks_waiting__.pop()
-        self.__tasks_pending__.append(news_url)
         return news_url
 
     # 完成任务 #
     def __done_task__(self, news_url):
-        self.__tasks_pending__.remove(news_url)    # 将任务从pending列表中移除
-
-    # 检查任务列表是否已清空 #
-    def __is_tasks_list_empty(self):
-        if len(self.__tasks_waiting__) + len(self.__tasks_pending__) == 0:
-            return True
-        return False
-
+        self.__task_list__.done_task(news_url)    # 将任务从pending列表中移除
