@@ -11,6 +11,13 @@
         "url": "result,data[],url",
         "title": "result,data[],title"
       }
+    },{
+      "tag": "Consume",
+      "list_url": "http://finance.sina.com.cn/consume/",
+      "xpaths": {
+        "url": "//div[@class='feed-card-item']/h2/a/@href",
+        "next": "//span[@class='pagebox_next']/a"
+      }
     }
   ]
 }

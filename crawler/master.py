@@ -1,5 +1,7 @@
 from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
 from urllib import request
+from lxml import etree
 from crawler.tasklist import TaskList
 import json
 import math
@@ -27,9 +29,8 @@ class Master:
         for entry in entries:
             if "api_json" in entry:
                 self.__task_list__.put_tasks(self.__parse_api_json__(entry, 150))
-            elif "url" in entry:
-                # TODO: use selenium to parse simple html
-                pass
+            elif "list_url" in entry:
+                self.__task_list__.put_tasks(self.__parse_dynamic_page__(entry, 150))
 
     # 监听网络端口以分发任务 #
     def dispatch(self):
@@ -37,8 +38,7 @@ class Master:
         while True:
             # 若任务列表为空，则程序退出
             if self.__task_list__.is_empty():
-                print("All tasks done!")
-                break
+                print("No task in list")
             # 接受来自Slave节点的连接
             conn, addr = self.__socket__.accept()
             try:
@@ -89,6 +89,30 @@ class Master:
             time.sleep(2)
         news_urls = list(set(news_urls))
         return news_urls
+
+    @staticmethod
+    def __parse_dynamic_page__(entry, count):
+        chrome_options = webdriver.ChromeOptions()  # 获取ChromeWebdriver配置文件
+        prefs = {"profile.managed_default_content_settings.images": 2}  # 设置不加载图片以加快速度
+        chrome_options.add_experimental_option("prefs", prefs)
+        chrome_options.add_argument("--headless")  # 不使用GUI界面
+        chrome_options.add_argument("--disable-gpu")  # 禁用GPU渲染加速
+        driver = webdriver.Chrome(chrome_options=chrome_options)  # 创建ChromeWebdriver
+        driver.set_page_load_timeout(10)  # 设置连接超时时间为15s
+        driver.get(entry["list_url"])
+
+        url_cnt = 0
+        url_list = list()
+        while url_cnt < count:
+            if url_cnt != 0:
+                time.sleep(1)
+                driver.find_element_by_xpath(entry["xpaths"]["next"]).click()
+            selector = etree.HTML(driver.page_source)
+            urls = selector.xpath(entry["xpaths"]["url"])
+            url_cnt += len(urls)
+            url_list.extend(urls)
+        driver.close()
+        return url_list
 
     # 分发任务 #
     def __dispatch_task__(self):
