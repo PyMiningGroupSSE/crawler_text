@@ -1,8 +1,8 @@
 from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 from urllib import request
 from lxml import etree
 from crawler.tasklist import TaskList
+import threading
 import json
 import math
 import socket
@@ -26,11 +26,17 @@ class Master:
 
     # 获取文章URL列表 #
     def analyze_urls(self, entries):
+        print("Initializing tasks list...")
         for entry in entries:
             if "api_json" in entry:
-                self.__task_list__.put_tasks(self.__parse_api_json__(entry, 150))
+                t = threading.Thread(target=self.__parse_urls_from_json__, args=(entry, 150, self.__task_list__))
+                t.start()
+                # self.__parse_urls_from_json__(entry, 150, self.__task_list__)
             elif "list_url" in entry:
-                self.__task_list__.put_tasks(self.__parse_dynamic_page__(entry, 150))
+                t = threading.Thread(target=self.__parse_urls_from_page__, args=(entry, 150, self.__task_list__))
+                t.start()
+                # self.__parse_urls_from_page__(entry, 150, self.__task_list__)
+        time.sleep(2)
 
     # 监听网络端口以分发任务 #
     def dispatch(self):
@@ -74,24 +80,23 @@ class Master:
                 print("Connection timeout")
             conn.close()
 
-    # 从API中获取文章URL列表 #
+    # 从API中获取文章URL列表并存入tasklist中 #
     @staticmethod
-    def __parse_api_json__(entry, count):
+    def __parse_urls_from_json__(entry, count, task_list):
         max_page = math.ceil(count / __ITEMS_PER_PAGE__)
         url_pattern = entry["api_json"]
-        news_urls = list()
         for i in range(1, max_page + 1):
+            news_urls = list()
             url = url_pattern.format(__ITEMS_PER_PAGE__, i)
             res = request.urlopen(url, timeout=3)
             data = json.loads(res.read(), encoding='utf8')
             for news_item in data["result"]["data"]:
                 news_urls.append(news_item["url"])
-            time.sleep(2)
-        news_urls = list(set(news_urls))
-        return news_urls
+            task_list.put_tasks(news_urls)
+            time.sleep(1)
 
     @staticmethod
-    def __parse_dynamic_page__(entry, count):
+    def __parse_urls_from_page__(entry, count, task_list):
         chrome_options = webdriver.ChromeOptions()  # 获取ChromeWebdriver配置文件
         prefs = {"profile.managed_default_content_settings.images": 2}  # 设置不加载图片以加快速度
         chrome_options.add_experimental_option("prefs", prefs)
@@ -102,7 +107,6 @@ class Master:
         driver.get(entry["list_url"])
 
         url_cnt = 0
-        url_list = list()
         while url_cnt < count:
             if url_cnt != 0:
                 time.sleep(1)
@@ -110,9 +114,8 @@ class Master:
             selector = etree.HTML(driver.page_source)
             urls = selector.xpath(entry["xpaths"]["url"])
             url_cnt += len(urls)
-            url_list.extend(urls)
+            task_list.put_tasks(urls)
         driver.close()
-        return url_list
 
     # 分发任务 #
     def __dispatch_task__(self):
